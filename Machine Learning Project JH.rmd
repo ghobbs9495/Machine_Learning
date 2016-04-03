@@ -1,0 +1,108 @@
+---
+title: "Machine Learning Project - Johns Hopkins"
+author: "G. Hobbs"
+date: "April 1, 2016"
+output: html_document
+---
+
+##https://rstudio-pubs-static.s3.amazonaws.com/29426_041c5ccb9a6a4bedb204e33144bb0ad4.html
+
+## C:\Users\ghobbs\Desktop\OK Folder\Gary Hobbs Stuff\COURSES
+
+## C:\Users\ghobbs\Desktop\OK Folder\Gary Hobbs Stuff\Coursera John Hopkins Certificate\Machine Learning
+
+#Introduction
+This is the course project of the John Hopkins' Practical Machine Learning course through Coursera. In this project, we were tasked with building a model that would predict what form of exercise was done by a participant using only measurements taken at the time of the exercise.
+Participants were asked to preform a bicep curl 5 different ways; one using the correct for and another four while making common mistakes in form. Readings were taken at the arm, forearm, belt, and dumbbell while the exercises were being preformed.
+The Weight Lifting Exercises Dataset used in this project can be found here: http://groupware.les.inf.puc-rio.br/har#dataset.
+Load Libraries
+The Caret and Random Forest libraries are used in making the prediction model. The doMC library is used to allow the computations to be done with parallel processing.
+
+#Load Packages & Set Seed
+```{r}
+library(caret)
+library(randomForest)
+set.seed(25)
+```
+
+#Download Data
+Data was downloaded from website and into directory
+
+#Set Working Directory
+```{r}
+setwd("C:/Users/ghobbs/Desktop/OK Folder/Gary Hobbs Stuff/Coursera John Hopkins Certificate/Machine Learning")
+```
+
+#Read Data into R
+The training and final prediciton data sets are read into R.
+```{r}
+finalTest <- read.csv("C:/Users/ghobbs/Desktop/OK Folder/Gary Hobbs Stuff/Coursera John Hopkins Certificate/Machine Learning/pml-testing.csv",head=TRUE, na.strings=c("NA",""))
+data <- read.csv("C:/Users/ghobbs/Desktop/OK Folder/Gary Hobbs Stuff/Coursera John Hopkins Certificate/Machine Learning/pml-training.csv",head=TRUE, na.strings=c("NA",""))
+```
+
+#Remove Missing Data and Not Revelant Columns
+Within the training data set, columns with missing data are removed. Then the first seven columns are also removed because they are identifying information about the participants and will not aid in creating the prediction model.
+```{r}
+invalid <- apply(data,2,function(x) {sum(is.na(x))})
+newData <- data[,which(invalid == 0)] 
+useless  <- grep("X|user_name|timestamp|new_window|num_window", names(newData))
+newData <- newData[,-useless]
+```
+
+#Create Test/Train Partition for Training Data
+A partition within the training data set is created, with 60% of the data in the train set and 40% in the test set.
+```{r}
+Part <- createDataPartition(y=newData$classe, p=0.6, list=FALSE)
+train <- newData[Part,]
+test <- newData[-Part,]
+```
+
+#Fit a Random Foreset Model to the Training Data
+A Random Forest Model is created using the training data. The default setting has been modified in order to shorten computing time.
+```{r}
+modControl <- trainControl(method='cv',number=5,repeats=1)
+modFit <- train(classe~., data=train, method='rf',preProc = c("center", "scale"), trControl=modControl)
+
+show(modFit$results)
+```
+
+#Use the Model on the Test Data
+The model created is applied to the test data set.
+```{r}
+pred <- predict(modFit, newdata=test)
+```
+#Create Confusion Matrix to Measure Out of Sample Error
+A confusion Matrix is made to estimate what the out of sample error will be.
+```{r}
+confusionMatrix(pred, test$classe)
+```
+
+#Pre-process Final Test Submission Data
+The Final Test data is pre-processed using the same steps and the training/test data sets.
+```{r}
+invalid <- apply(finalTest,2,function(x) {sum(is.na(x))})
+finalTest1 <- finalTest[,which(invalid == 0)] 
+useless  <- grep("X|user_name|timestamp|new_window|num_window", names(finalTest))
+realTest <- finalTest1[,-useless]
+```
+
+#Predict Using Final Test Submission Data
+The prediction model is applied to the final test data set.
+```{r}
+predFinal <- predict(modFit$finalModel, newdata=realTest)
+answers <- as.character(predFinal)
+```
+
+#Create Submission Files
+Using the code provided from the assignment, the prediciton for each line of data is saved into its own .txt file.
+```{r}
+pml_write_files = function(x){
+    n = length(x)
+    for(i in 1:n){
+        filename = paste0("problem_id_",i,".txt")
+        write.table(x[i],file=filename,quote=FALSE,row.names=FALSE,col.names=FALSE)
+    }
+}
+
+pml_write_files(answers)
+```
